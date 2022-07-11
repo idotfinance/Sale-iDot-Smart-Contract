@@ -57,25 +57,25 @@ interface IERC20 {
     event Transfer(address indexed from, address indexed to, uint256 value);
 }
 
-contract iDotFinancePrivateSale is Owned {
+contract iDotFinanceSale is Owned {
 
     using SafeMath for uint256;
 
     IERC20 public IDOT = IERC20(0x9650Fd508E47c0f8787237f06E293fc299332603);
-    address public Recipient = 0xD784D85662Cc9e48FC43dc9dEe1371Cb967ADC56;
+    address public Recipient = 0xc005eF0Ebf220e3824a5739F5085885dC8A00115;
 
-    uint256 public tokenRatePerEth = 300; // 300 * (10 ** decimals) IDOT per BNB
-    uint256 public minETHLimit = 0.1 ether;
-    uint256 public maxETHLimit = 5 ether;
+    uint256 public TokenRatePerBnb = 300; // 300 * (10 ** decimals) IDOT per BNB
+    uint256 public minBNBLimit = 0.01 ether;
+    uint256 public maxBNBLimit = 5 ether;
 
     uint256 public hardCap = 500 ether;
     uint256 public softCap = 250 ether;
 
-    uint256 public totalRaisedBNB = 0; // total BNB raised by this Sale
+    uint256 public totalRaisedBNB = 0; // total BNB raised by sale
     uint256 public totaltokenSold = 0;
 
-    uint256 public startTime;
-    uint256 public endTime;
+    uint256 public startTime; // 1657807200
+    uint256 public endTime; // 1657832400
     bool public contractPaused; // circuit breaker
 
     mapping(address => uint256) public usersInvestments;
@@ -83,19 +83,19 @@ contract iDotFinancePrivateSale is Owned {
     constructor(uint256 _startTime, uint256 _endTime) {
         require(_startTime > block.timestamp, 'past timestamp');
         startTime = _startTime;
-        if(_endTime > _startTime + 7 days) {
+        if(_endTime > _startTime + 1 minutes) {
             endTime = _endTime;
         } else {
-            endTime = _startTime + 10 days;
+            endTime = _startTime + 1 minutes;
         }
     }
 
     modifier checkIfPaused() {
-        require(contractPaused == false, "Contract is paused");
+        require(contractPaused == false, "contract is paused");
         _;
     }
 
-    function setPrivateSaleToken(address tokenaddress) external onlyOwner {
+    function setSaleToken(address tokenaddress) external onlyOwner {
         require( tokenaddress != address(0) );
         IDOT = IERC20(tokenaddress);
     }
@@ -104,16 +104,16 @@ contract iDotFinancePrivateSale is Owned {
         Recipient = recipient;
     }
 
-    function setTokenRatePerEth(uint256 rate) external onlyOwner {
-        tokenRatePerEth = rate;
+    function setTokenRatePerBnb(uint256 rate) external onlyOwner {
+        TokenRatePerBnb = rate;
     }
 
-    function setMinEthLimit(uint256 amount) external onlyOwner {
-        minETHLimit = amount;    
+    function setminBNBLimit(uint256 amount) external onlyOwner {
+        minBNBLimit = amount;    
     }
 
-    function setMaxEthLimit(uint256 amount) external onlyOwner {
-        maxETHLimit = amount;    
+    function setmaxBNBLimit(uint256 amount) external onlyOwner {
+        maxBNBLimit = amount;    
     }
 
     function setStartTime(uint256 _startTime) external onlyOwner {
@@ -122,7 +122,7 @@ contract iDotFinancePrivateSale is Owned {
     }
 
     function setEndTime(uint256 _endTime) external onlyOwner {
-        require(_endTime > startTime + 1 days, 'too short period');
+        require(_endTime > startTime + 1 minutes, 'too short period');
         endTime = _endTime;
     }
 
@@ -145,13 +145,13 @@ contract iDotFinancePrivateSale is Owned {
         require(block.timestamp < endTime, 'Sale has ended');
         require(totalRaisedBNB <= hardCap, 'HardCap exceeded');
         require(
-                usersInvestments[msg.sender].add(msg.value) <= maxETHLimit
-                && usersInvestments[msg.sender].add(msg.value) >= minETHLimit,
+                usersInvestments[msg.sender].add(msg.value) <= maxBNBLimit
+                && usersInvestments[msg.sender].add(msg.value) >= minBNBLimit,
                 "Installment Invalid."
         );
         
-        uint256 tokenAmount = getTokensPerEth(msg.value);
-        require(IDOT.transfer(msg.sender, tokenAmount), "Insufficient balance of private sale contract!");
+        uint256 tokenAmount = getTokensPerBnb(msg.value);
+        require(IDOT.transfer(msg.sender, tokenAmount), "Insufficient balance of sale contract!");
 
         totalRaisedBNB = totalRaisedBNB.add(msg.value);
         totaltokenSold = totaltokenSold.add(tokenAmount);
@@ -161,16 +161,16 @@ contract iDotFinancePrivateSale is Owned {
     }
 
     function getUnsoldTokens(address token, address to) external onlyOwner {
-        require(block.timestamp > endTime + 1 days, "You cannot get tokens until the private sale is closed.");
+        require(block.timestamp > endTime + 1 minutes, "You cannot get tokens until the sale is closed.");
         IERC20(token).transfer(to, IERC20(token).balanceOf(address(this)) );
         payable(to).transfer(address(this).balance);
     }
 
     function getUserRemainingAllocation(address account) external view returns ( uint256 ) {
-        return maxETHLimit.sub(usersInvestments[account]);
+        return maxBNBLimit.sub(usersInvestments[account]);
     }
 
-    function getTokensPerEth(uint256 amount) internal view returns(uint256) {
-        return amount.mul(tokenRatePerEth).div(10**(uint256(5).sub(IDOT.decimals())));
+    function getTokensPerBnb(uint256 amount) internal view returns(uint256) {
+        return amount.mul(TokenRatePerBnb).div(10**(uint256(18).sub(IDOT.decimals())));
     }
 }
